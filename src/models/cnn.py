@@ -18,7 +18,7 @@ class CNN(nn.Module):
             # Convolutional layers
             self.conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1)
             self.relu1 = nn.ReLU()
-            self.pool1= nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+            self.pool1= nn.MaxPool2d(kernel_size=2, stride=2)
             
             self.conv2=nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
             self.relu2=nn.ReLU()
