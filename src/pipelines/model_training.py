@@ -72,7 +72,7 @@ def main():
         # Epoch Loop
         # -----------------------------
         for epoch in range(EPOCHS):
-            train_loss, _, train_acc = trainer.start_training_loop(epoch)
+            train_loss, train_acc = trainer.train_one_epoch(epoch, train_loader)
             val_loss, _, val_acc = evaluator.start_evaluation_loop(epoch)
 
             wandb.log({

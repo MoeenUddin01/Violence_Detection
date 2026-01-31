@@ -68,11 +68,12 @@ class VideoDataset(Dataset):
 
         frames = self._read_video(video_path)
 
-        # Apply transform to each frame (if provided)
         if self.transform:
             frames = [self.transform(frame) for frame in frames]
 
-        # Stack frames into tensor (T, C, H, W)
-        frames = torch.stack(frames)
+        frames = torch.stack(frames)     # (T, C, H, W)
+        frames = frames.mean(dim=0)      # (C, H, W)  <-- FIX
+
+        label = torch.tensor(label, dtype=torch.long)  # <-- FIX
 
         return frames, label
