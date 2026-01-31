@@ -1,7 +1,7 @@
 # src/pipelines/model_training.py
 
 import torch
-from src.data.loader import train_loader, test_loader  # Your data loaders
+from src.data.loader import get_train_loader, get_test_loader   # Your data loaders
 from src.models.cnn import CNN                         # Your CNN model
 from src.models.train import Trainer                   # Training loop class
 from src.models.evaluation import Evaluator           # Evaluation class
