@@ -1,11 +1,11 @@
 # src/pipelines/model_training.py
 
 import torch
-from src.data.loader import get_train_loader, get_test_loader  # Your data loader functions
-from src.models.cnn import CNN                                  # Your CNN model
-from src.models.train import Trainer                            # Training loop class
-from src.models.evaluation import Evaluator                    # Evaluation class
-import wandb                                                    # Weights & Biases for experiment tracking
+from src.data.loader import get_train_loader, get_test_loader
+from src.models.cnn import CNN
+from src.models.train import Trainer
+from src.models.evaluation import Evaluator
+import wandb
 import os
 from datetime import datetime
 
@@ -19,7 +19,6 @@ def main():
         LEARNING_RATE = 0.001
         DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # Store config in a dictionary for logging in W&B
         config = {
             "Epochs": EPOCHS,
             "Batch Size": BATCH_SIZE,
@@ -29,7 +28,7 @@ def main():
         }
 
         # -----------------------------
-        # Initialize Weights & Biases
+        # Initialize W&B
         # -----------------------------
         wandb.init(
             project="Violence-Detection-CNN",
@@ -42,29 +41,19 @@ def main():
         # -----------------------------
         model = CNN().to(DEVICE)
         print("Using device:", DEVICE)
-        # torch.set_default_device(DEVICE)
+        torch.set_default_device(DEVICE)
 
         # -----------------------------
-        # Create DataLoaders (FIXED)
+        # Load Data
         # -----------------------------
         train_loader = get_train_loader(batch_size=BATCH_SIZE)
         test_loader = get_test_loader(batch_size=BATCH_SIZE)
 
         # -----------------------------
-        # Initialize Trainer and Evaluator
+        # Trainer & Evaluator
         # -----------------------------
-        trainer = Trainer(
-            model=model,
-            learning_rate=LEARNING_RATE,
-            device=DEVICE
-                        )
-
-        evaluator = Evaluator(
-            
-            data=test_loader,
-            model=model,
-            device=DEVICE
-        )
+        trainer = Trainer(model=model, learning_rate=LEARNING_RATE, device=DEVICE)
+        evaluator = Evaluator(data=test_loader, model=model, device=DEVICE)
 
         BEST_ACCURACY = 0
 
@@ -72,9 +61,41 @@ def main():
         # Epoch Loop
         # -----------------------------
         for epoch in range(EPOCHS):
-            train_loss, train_acc = trainer.train_one_epoch(epoch, train_loader)
-            val_loss, _, val_acc = evaluator.start_evaluation_loop(epoch)
+            train_loss_total = 0.0
+            train_correct_total = 0
+            train_samples = 0
 
+            # -----------------------------
+            # Training Loop with try-except
+            # -----------------------------
+            for batch_idx, (images, labels) in enumerate(train_loader):
+                try:
+                    images = images.to(DEVICE)
+                    labels = labels.to(DEVICE)
+
+                    loss, correct = trainer.train_batch(images, labels)
+                    train_loss_total += loss
+                    train_correct_total += correct
+                    train_samples += labels.size(0)
+
+                except Exception as e:
+                    print(f"[WARNING] Skipped batch {batch_idx} due to error: {e}")
+
+            train_loss = train_loss_total / max(1, len(train_loader))
+            train_acc = 100.0 * train_correct_total / max(1, train_samples)
+
+            # -----------------------------
+            # Evaluation Loop with try-except
+            # -----------------------------
+            try:
+                val_loss, val_acc = evaluator.evaluate()
+            except Exception as e:
+                print(f"[WARNING] Evaluation failed at epoch {epoch}: {e}")
+                val_loss, val_acc = 0.0, 0.0
+
+            # -----------------------------
+            # Logging
+            # -----------------------------
             wandb.log({
                 "Epoch": epoch + 1,
                 "Training Loss": train_loss,
@@ -83,6 +104,9 @@ def main():
                 "Validation Accuracy": val_acc
             })
 
+            # -----------------------------
+            # Save Best Model
+            # -----------------------------
             if val_acc > BEST_ACCURACY:
                 BEST_ACCURACY = val_acc
                 saved_model_path = trainer.save_model()
