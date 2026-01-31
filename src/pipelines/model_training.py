@@ -60,7 +60,7 @@ def main():
                         )
 
         evaluator = Evaluator(
-            batch_size=BATCH_SIZE,
+            
             data=test_loader,
             model=model,
             device=DEVICE
