@@ -5,7 +5,7 @@ from src.data.transform import train_transform, test_transform
 train_dir = "datas/processed/train"
 test_dir = "datas/processed/test"
 
-def get_train_loader(batch_size=4, num_workers=2):
+def get_train_loader(batch_size=4, num_workers=0):
     try:
         train_dataset = VideoDataset(
             root_dir=train_dir,
@@ -24,7 +24,7 @@ def get_train_loader(batch_size=4, num_workers=2):
         print(f"[ERROR] Failed to create train loader: {e}")
         return None
 
-def get_test_loader(batch_size=4, num_workers=2):
+def get_test_loader(batch_size=4, num_workers=0):
     try:
         test_dataset = VideoDataset(
             root_dir=test_dir,

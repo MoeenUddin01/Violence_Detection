@@ -46,8 +46,8 @@ def main():
         # -----------------------------
         # Load Data
         # -----------------------------
-        train_loader = get_train_loader(batch_size=BATCH_SIZE)
-        test_loader = get_test_loader(batch_size=BATCH_SIZE)
+        train_loader = get_train_loader(batch_size=BATCH_SIZE,num_workers=0)
+        test_loader = get_test_loader(batch_size=BATCH_SIZE,num_workers=0)
 
         # -----------------------------
         # Trainer & Evaluator
