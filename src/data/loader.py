@@ -2,7 +2,7 @@
 
 
 from torch.utils.data import DataLoader
-from src.data.datset import VideoDataset
+from src.data.dataset import VideoDataset
 from src.data.transform import train_transform, test_transform
 
 # =========================
