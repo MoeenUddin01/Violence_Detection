@@ -41,7 +41,7 @@ def main():
         # -----------------------------
         model = CNN().to(DEVICE)
         print("Using device:", DEVICE)
-        torch.set_default_device(DEVICE)
+        
 
         # -----------------------------
         # Load Data
