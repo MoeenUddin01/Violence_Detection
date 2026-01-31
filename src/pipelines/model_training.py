@@ -54,13 +54,10 @@ def main():
         # Initialize Trainer and Evaluator
         # -----------------------------
         trainer = Trainer(
-            batch_size=BATCH_SIZE,
-            learning_rate=LEARNING_RATE,
-            data=train_loader,
             model=model,
-            model_path="artifacts",
+            learning_rate=LEARNING_RATE,
             device=DEVICE
-        )
+                        )
 
         evaluator = Evaluator(
             batch_size=BATCH_SIZE,
