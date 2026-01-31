@@ -13,25 +13,14 @@ logger.setLevel(logging.INFO)
 
 
 class Trainer:
-    """
-    Trainer class responsible for training the CNN model
-    on video frames (violence / non-violence).
-    """
+
 
     def __init__(
         self,
-        model: nn.Module,
-        learning_rate: float,
-        device: str
+        model,
+        learning_rate,
+        device
     ):
-        """
-        Initialize the Trainer.
-
-        Args:
-            model (nn.Module): The CNN model to train.
-            learning_rate (float): Learning rate for the optimizer.
-            device (str): "cuda" or "cpu".
-        """
         try:
             self.device = torch.device(device)
             self.model = model.to(self.device)
