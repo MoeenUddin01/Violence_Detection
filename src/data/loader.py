@@ -5,7 +5,7 @@ from src.data.transform import train_transform, test_transform
 train_dir = "datas/processed/train"
 test_dir = "datas/processed/test"
 
-def get_train_loader(batch_size=4, num_workers=2):
+def get_train_loader(batch_size=4, num_workers=0):
     train_dataset = VideoDataset(
         root_dir=train_dir,
         frames_per_video=16,
@@ -20,7 +20,7 @@ def get_train_loader(batch_size=4, num_workers=2):
         pin_memory=True
     )
 
-def get_test_loader(batch_size=4, num_workers=2):
+def get_test_loader(batch_size=4, num_workers=0):
     test_dataset = VideoDataset(
         root_dir=test_dir,
         frames_per_video=16,
