@@ -15,21 +15,23 @@ def main():
         # Training Configuration
         # -----------------------------
         EPOCHS = 10
-        BATCH_SIZE = 16
+        BATCH_SIZE = 4           # Reduce batch size for video data to avoid memory issues
         LEARNING_RATE = 0.001
         DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+        print("Using device:", DEVICE)
+
+        # -----------------------------
+        # W&B Config
+        # -----------------------------
         config = {
             "Epochs": EPOCHS,
             "Batch Size": BATCH_SIZE,
             "Learning Rate": LEARNING_RATE,
             "Device": DEVICE,
-            "Model": CNN
+            "Model": "CNN"
         }
 
-        # -----------------------------
-        # Initialize W&B
-        # -----------------------------
         wandb.init(
             project="Violence-Detection-CNN",
             config=config,
@@ -40,14 +42,14 @@ def main():
         # Model Initialization
         # -----------------------------
         model = CNN().to(DEVICE)
-        print("Using device:", DEVICE)
-        
+        torch.set_default_device(DEVICE)  # Ensure PyTorch uses GPU
 
         # -----------------------------
         # Load Data
         # -----------------------------
-        train_loader = get_train_loader(batch_size=BATCH_SIZE,num_workers=0)
-        test_loader = get_test_loader(batch_size=BATCH_SIZE,num_workers=0)
+        # Set num_workers=0 on Colab to avoid 'cuda/cpu generator' error
+        train_loader = get_train_loader(batch_size=BATCH_SIZE, num_workers=0)
+        test_loader = get_test_loader(batch_size=BATCH_SIZE, num_workers=0)
 
         # -----------------------------
         # Trainer & Evaluator
@@ -66,14 +68,16 @@ def main():
             train_samples = 0
 
             # -----------------------------
-            # Training Loop with try-except
+            # Training Loop
             # -----------------------------
             for batch_idx, (images, labels) in enumerate(train_loader):
                 try:
                     images = images.to(DEVICE)
                     labels = labels.to(DEVICE)
 
-                    loss, correct = trainer.train_batch(images, labels)
+                    # Corrected method: train_one_batch (not train_batch)
+                    loss, correct = trainer.train_one_batch(images, labels)
+
                     train_loss_total += loss
                     train_correct_total += correct
                     train_samples += labels.size(0)
@@ -85,7 +89,7 @@ def main():
             train_acc = 100.0 * train_correct_total / max(1, train_samples)
 
             # -----------------------------
-            # Evaluation Loop with try-except
+            # Evaluation Loop
             # -----------------------------
             try:
                 val_loss, val_acc = evaluator.evaluate()
@@ -112,11 +116,7 @@ def main():
                 saved_model_path = trainer.save_model()
                 if saved_model_path:
                     print(f"Model with Accuracy {val_acc:.4f} Saved Successfully")
-                    wandb.log_model(
-                        saved_model_path,
-                        "violence_detection_cnn",
-                        aliases=[f"epoch-{epoch+1}"]
-                    )
+                    wandb.save(saved_model_path)
 
     except Exception as e:
         print(f"Error in Training Script: {e}")
@@ -126,5 +126,6 @@ def main():
 # Entry point
 # -----------------------------
 if __name__ == "__main__":
+    # Colab environment: provide W&B key via environment variable or manually
     wandb.login(key=os.environ.get("WANDB_API_KEY", None))
     main()
