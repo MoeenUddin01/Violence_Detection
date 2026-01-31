@@ -15,15 +15,11 @@ def main():
         # Training Configuration
         # -----------------------------
         EPOCHS = 10
-        BATCH_SIZE = 4           # Reduce batch size for video data to avoid memory issues
+        BATCH_SIZE = 16
         LEARNING_RATE = 0.001
         DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
         print("Using device:", DEVICE)
 
-        # -----------------------------
-        # W&B Config
-        # -----------------------------
         config = {
             "Epochs": EPOCHS,
             "Batch Size": BATCH_SIZE,
@@ -32,6 +28,9 @@ def main():
             "Model": "CNN"
         }
 
+        # -----------------------------
+        # Initialize W&B
+        # -----------------------------
         wandb.init(
             project="Violence-Detection-CNN",
             config=config,
@@ -42,12 +41,10 @@ def main():
         # Model Initialization
         # -----------------------------
         model = CNN().to(DEVICE)
-        torch.set_default_device(DEVICE)  # Ensure PyTorch uses GPU
 
         # -----------------------------
-        # Load Data
+        # Load Data (num_workers=0 for Colab GPU)
         # -----------------------------
-        # Set num_workers=0 on Colab to avoid 'cuda/cpu generator' error
         train_loader = get_train_loader(batch_size=BATCH_SIZE, num_workers=0)
         test_loader = get_test_loader(batch_size=BATCH_SIZE, num_workers=0)
 
@@ -63,34 +60,10 @@ def main():
         # Epoch Loop
         # -----------------------------
         for epoch in range(EPOCHS):
-            train_loss_total = 0.0
-            train_correct_total = 0
-            train_samples = 0
+            # Train one epoch
+            train_loss, train_acc = trainer.train_one_epoch(epoch, train_loader)
 
-            # -----------------------------
-            # Training Loop
-            # -----------------------------
-            for batch_idx, (images, labels) in enumerate(train_loader):
-                try:
-                    images = images.to(DEVICE)
-                    labels = labels.to(DEVICE)
-
-                    # Corrected method: train_one_batch (not train_batch)
-                    loss, correct = trainer.train_one_batch(images, labels)
-
-                    train_loss_total += loss
-                    train_correct_total += correct
-                    train_samples += labels.size(0)
-
-                except Exception as e:
-                    print(f"[WARNING] Skipped batch {batch_idx} due to error: {e}")
-
-            train_loss = train_loss_total / max(1, len(train_loader))
-            train_acc = 100.0 * train_correct_total / max(1, train_samples)
-
-            # -----------------------------
-            # Evaluation Loop
-            # -----------------------------
+            # Evaluate
             try:
                 val_loss, val_acc = evaluator.evaluate()
             except Exception as e:
@@ -98,7 +71,7 @@ def main():
                 val_loss, val_acc = 0.0, 0.0
 
             # -----------------------------
-            # Logging
+            # Logging to W&B
             # -----------------------------
             wandb.log({
                 "Epoch": epoch + 1,
@@ -113,10 +86,9 @@ def main():
             # -----------------------------
             if val_acc > BEST_ACCURACY:
                 BEST_ACCURACY = val_acc
-                saved_model_path = trainer.save_model()
-                if saved_model_path:
-                    print(f"Model with Accuracy {val_acc:.4f} Saved Successfully")
-                    wandb.save(saved_model_path)
+                saved_model_path = f"violence_detection_epoch{epoch+1}.pth"
+                trainer.save_model(saved_model_path)
+                print(f"Best Model Saved with Accuracy: {val_acc:.2f}%")
 
     except Exception as e:
         print(f"Error in Training Script: {e}")
@@ -126,6 +98,6 @@ def main():
 # Entry point
 # -----------------------------
 if __name__ == "__main__":
-    # Colab environment: provide W&B key via environment variable or manually
+    # Login to W&B (optional)
     wandb.login(key=os.environ.get("WANDB_API_KEY", None))
     main()
