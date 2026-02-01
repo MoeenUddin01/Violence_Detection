@@ -24,10 +24,10 @@ def main():
     # --------------------------
     # Hyperparameters
     # --------------------------
-    BATCH_SIZE = 8
+    BATCH_SIZE = 4
     EPOCHS = 10
     LR = 1e-3
-    FRAMES_PER_VIDEO = 16
+    FRAMES_PER_VIDEO = 8
 
     # --------------------------
     # Initialize W&B
@@ -47,8 +47,8 @@ def main():
     # --------------------------
     # Load data
     # --------------------------
-    train_loader = get_train_loader(BATCH_SIZE, num_workers=2, frames_per_video=FRAMES_PER_VIDEO)
-    test_loader = get_test_loader(BATCH_SIZE, num_workers=2, frames_per_video=FRAMES_PER_VIDEO)
+    train_loader = get_train_loader(BATCH_SIZE, num_workers=0, frames_per_video=FRAMES_PER_VIDEO)
+    test_loader = get_test_loader(BATCH_SIZE, num_workers=0, frames_per_video=FRAMES_PER_VIDEO)
 
     print("Train batches:", len(train_loader))
     print("Test batches:", len(test_loader))
