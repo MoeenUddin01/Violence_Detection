@@ -1,60 +1,75 @@
 # src/pipelines/model_training.py
+import sys
+import os
+
 
 import torch
 from torch.utils.data import DataLoader
-from src.data.dataset import VideoDataset
-from src.models.cnn import CNN
+
+
+from src.data.loader import get_train_loader, get_test_loader
+from src.models.cnn import CNN         # <-- use your existing cnn.py
 from src.models.train import Trainer
+from src.models.evaluation import Evaluator
+
 import wandb
-import os
 from datetime import datetime
+import os
 
 def main():
+    # Device
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    BATCH_SIZE = 16
-    EPOCHS = 10
-    LEARNING_RATE = 0.001
 
-    # ------------------ W&B ------------------
+    # Hyperparameters
+    BATCH_SIZE = 8
+    EPOCHS = 10
+    LR = 1e-3
+    FRAMES_PER_VIDEO = 16
+
+    # Initialize W&B
     wandb.init(
         project="Violence-Detection-CNN",
         config={
-            "Epochs": EPOCHS,
-            "Batch Size": BATCH_SIZE,
-            "Learning Rate": LEARNING_RATE,
-            "Device": DEVICE
+            "batch_size": BATCH_SIZE,
+            "epochs": EPOCHS,
+            "learning_rate": LR,
+            "frames_per_video": FRAMES_PER_VIDEO,
+            "device": DEVICE
         },
-        name=f"Experiment-{datetime.now().strftime('%d_%m_%Y_%H_%M')}"
+        name=f"Run-{datetime.now().strftime('%d_%m_%Y_%H_%M')}"
     )
 
-    # ------------------ Dataset ------------------
-    train_dataset = VideoDataset(root_dir="datas/processed/train")
-    test_dataset = VideoDataset(root_dir="datas/processed/test")
+    # DataLoaders
+    train_loader = get_train_loader(BATCH_SIZE, num_workers=2, frames_per_video=FRAMES_PER_VIDEO)
+    test_loader = get_test_loader(BATCH_SIZE, num_workers=2, frames_per_video=FRAMES_PER_VIDEO)
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+    # Model and Trainer
+    model = CNN(num_classes=2)
+    trainer = Trainer(model=model, learning_rate=LR, device=DEVICE)
+    evaluator = Evaluator(model=model, data_loader=test_loader, device=DEVICE)
 
-    # ------------------ Model & Trainer ------------------
-    model = CNN().to(DEVICE)
-    trainer = Trainer(model=model, learning_rate=LEARNING_RATE, device=DEVICE)
-
-    # ------------------ Training Loop ------------------
     best_acc = 0
-    for epoch in range(EPOCHS):
-        train_loss, train_acc = trainer.train_one_epoch(epoch, train_loader)
-        print(f"Epoch {epoch+1}/{EPOCHS} | Loss: {train_loss:.4f} | Acc: {train_acc:.2f}%")
 
+    for epoch in range(EPOCHS):
+        train_loss, train_acc = trainer.train_one_epoch(train_loader)
+        val_loss, val_acc = evaluator.evaluate()
+
+        print(f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%")
+
+        # Log to W&B
         wandb.log({
             "Epoch": epoch+1,
-            "Training Loss": train_loss,
-            "Training Accuracy": train_acc
+            "Train Loss": train_loss,
+            "Train Accuracy": train_acc,
+            "Val Loss": val_loss,
+            "Val Accuracy": val_acc
         })
 
         # Save best model
-        if train_acc > best_acc:
-            best_acc = train_acc
+        if val_acc > best_acc:
+            best_acc = val_acc
             path = trainer.save_model(f"best_model_epoch{epoch+1}.pth")
-            print(f"Saved model at {path}")
+            print(f"Saved best model at {path}")
             wandb.save(path)
 
 if __name__ == "__main__":

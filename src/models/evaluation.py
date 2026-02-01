@@ -1,56 +1,35 @@
+# src/models/evaluator.py
+
 import torch
 from torch.utils.data import DataLoader
 
-
 class Evaluator:
     """
-    This class is responsible for evaluating a trained model
-    on validation or test data.
+    Evaluate CNNTemporal model on validation/test data
     """
 
-    def __init__(self, model, data: DataLoader, device: str):
-        self.model = model
-        self.data = data
+    def __init__(self, model, data_loader: DataLoader, device='cuda'):
+        self.model = model.to(device)
+        self.data_loader = data_loader
         self.device = device
-        self.loss_fn = torch.nn.CrossEntropyLoss()
+        self.criterion = torch.nn.CrossEntropyLoss()
 
     def evaluate(self):
-        """
-        Evaluates the model on the given dataset.
-        Returns:
-            avg_loss (float)
-            accuracy (float)
-        """
-
-        # switch model to evaluation mode
         self.model.eval()
-
-        total_loss = 0.0
+        total_loss = 0
         correct = 0
         total = 0
 
-        # no gradients needed during evaluation
         with torch.no_grad():
-            for x, y in self.data:
-                # move data to device
-                x = x.to(self.device)
-                y = y.to(self.device)
-
-                # forward pass
-                outputs = self.model(x)
-
-                # compute loss
-                loss = self.loss_fn(outputs, y)
+            for frames, labels in self.data_loader:
+                frames, labels = frames.to(self.device), labels.to(self.device)
+                outputs = self.model(frames)
+                loss = self.criterion(outputs, labels)
                 total_loss += loss.item()
+                _, preds = torch.max(outputs,1)
+                total += labels.size(0)
+                correct += (preds==labels).sum().item()
 
-                # get predicted class
-                _, predicted = torch.max(outputs, dim=1)
-
-                total += y.size(0)
-                correct += (predicted == y).sum().item()
-
-        # calculate final metrics
-        avg_loss = total_loss / len(self.data)
-        accuracy = 100.0 * correct / total if total > 0 else 0.0
-
+        avg_loss = total_loss/len(self.data_loader)
+        accuracy = 100*correct/total
         return avg_loss, accuracy
