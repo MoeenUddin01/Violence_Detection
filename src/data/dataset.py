@@ -11,7 +11,7 @@ class VideoDataset(Dataset):
     Returns a sequence of frames per video with label.
     Output shape: (num_frames, 3, 224, 224)
     """
-
+    
     def __init__(self, root_dir, frames_per_video=16, transform=None):
         self.root_dir = root_dir
         self.frames_per_video = frames_per_video
@@ -30,7 +30,7 @@ class VideoDataset(Dataset):
                 if file_name.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
                     self.video_paths.append(os.path.join(class_path, file_name))
                     self.labels.append(label)
-
+    
     def __len__(self):
         return len(self.video_paths)
 
