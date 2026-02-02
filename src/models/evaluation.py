@@ -4,12 +4,13 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
 import wandb
-import seaborn as sns
-import matplotlib.pyplot as plt
+import numpy as np
 
 class Evaluator:
     """
-    Evaluates a model on a validation/test set and logs metrics to W&B.
+    Evaluator for video classification models.
+    Computes loss, accuracy, confusion matrix, precision, recall, F1.
+    Logs all metrics to W&B.
     """
 
     def __init__(self, model, data_loader, device='cuda'):
@@ -20,9 +21,9 @@ class Evaluator:
 
     def evaluate(self):
         self.model.eval()
+        running_loss = 0.0
         all_preds = []
         all_labels = []
-        running_loss = 0.0
 
         with torch.no_grad():
             for frames, labels in self.data_loader:
@@ -31,25 +32,34 @@ class Evaluator:
                 loss = self.criterion(outputs, labels)
                 running_loss += loss.item()
 
-                _, preds = torch.max(outputs, 1)
-                all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(labels.cpu().numpy())
+                preds = torch.argmax(outputs, dim=1)
+                all_preds.append(preds.cpu())
+                all_labels.append(labels.cpu())
 
-        # Compute metrics
-        val_loss = running_loss / len(self.data_loader)
-        val_acc = 100 * sum([p == l for p, l in zip(all_preds, all_labels)]) / len(all_labels)
-        precision = precision_score(all_labels, all_preds, average='weighted')
-        recall = recall_score(all_labels, all_preds, average='weighted')
-        f1 = f1_score(all_labels, all_preds, average='weighted')
+        # Combine all batches
+        all_preds = torch.cat(all_preds)
+        all_labels = torch.cat(all_labels)
+
+        # Metrics
+        epoch_loss = running_loss / len(self.data_loader)
+        epoch_acc = 100 * (all_preds == all_labels).sum().item() / len(all_labels)
 
         # Confusion matrix
-        cm = confusion_matrix(all_labels, all_preds)
-        plt.figure(figsize=(5,4))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-        plt.xlabel("Predicted")
-        plt.ylabel("Actual")
-        plt.title("Confusion Matrix")
-        wandb.log({"Confusion Matrix": wandb.Image(plt)})
-        plt.close()
+        cm = confusion_matrix(all_labels.numpy(), all_preds.numpy())
 
-        return val_loss, val_acc, precision, recall, f1
+        # Precision, Recall, F1
+        precision = precision_score(all_labels.numpy(), all_preds.numpy(), average='macro', zero_division=0)
+        recall = recall_score(all_labels.numpy(), all_preds.numpy(), average='macro', zero_division=0)
+        f1 = f1_score(all_labels.numpy(), all_preds.numpy(), average='macro', zero_division=0)
+
+        # Log metrics to W&B
+        wandb.log({
+            "Val Loss": epoch_loss,
+            "Val Accuracy": epoch_acc,
+            "Val Precision": precision,
+            "Val Recall": recall,
+            "Val F1": f1,
+            "Confusion Matrix": wandb.Table(data=cm.tolist(), columns=[f"Pred_{i}" for i in range(cm.shape[0])])
+        })
+
+        return epoch_loss, epoch_acc, precision, recall, f1, cm
