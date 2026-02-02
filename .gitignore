@@ -210,3 +210,5 @@ __marimo__/
 run_colab.ipynb
 datas/
 wandb/
+checkpoints/
+artifacts/
