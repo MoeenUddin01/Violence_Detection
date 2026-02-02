@@ -1,4 +1,5 @@
 # src/pipelines/model_training.py
+
 import sys
 import os
 from datetime import datetime
@@ -8,7 +9,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.data.loader import get_train_loader, get_test_loader
-from src.models.cnn import CNN          # Your CNN model
+from src.models.cnn import CNN
 from src.models.train import Trainer
 from src.models.evaluation import Evaluator
 
@@ -78,28 +79,46 @@ def main():
     # --------------------------
     for epoch in range(EPOCHS):
         print(f"\n🔥 Starting epoch {epoch+1}/{EPOCHS}")
-        torch.cuda.empty_cache()  # Free up GPU memory
+        torch.cuda.empty_cache()  # Free GPU memory
 
-        # Batch-level training with tqdm progress bar
+        # Metrics accumulators
         running_loss = 0.0
         correct = 0
         total = 0
-        for frames, labels in tqdm(train_loader, desc=f"Epoch {epoch+1} batches"):
-            frames, labels = frames.to(DEVICE), labels.to(DEVICE)
 
-            # Forward + backward
-            trainer.optimizer.zero_grad()
-            outputs = trainer.model(frames)
-            loss = trainer.criterion(outputs, labels)
-            loss.backward()
-            trainer.optimizer.step()
+        # Progress bar with ETA
+        with tqdm(train_loader, desc=f"Epoch {epoch+1} batches", unit="batch") as pbar:
+            for frames, labels in pbar:
+                # --------------------------
+                # GPU dry-run checks
+                # --------------------------
+                if frames.dim() != 5:
+                    raise ValueError(f"Frames shape incorrect: {frames.shape}")
+                if frames.size(1) != FRAMES_PER_VIDEO:
+                    raise ValueError(f"Frames per video mismatch: {frames.size(1)} vs {FRAMES_PER_VIDEO}")
 
-            # Metrics
-            running_loss += loss.item()
-            _, preds = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (preds == labels).sum().item()
+                frames, labels = frames.to(DEVICE), labels.to(DEVICE)
 
+                # Forward + backward
+                trainer.optimizer.zero_grad()
+                outputs = trainer.model(frames)
+                loss = trainer.criterion(outputs, labels)
+                loss.backward()
+                trainer.optimizer.step()
+
+                # Metrics
+                running_loss += loss.item()
+                _, preds = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (preds == labels).sum().item()
+
+                # Update progress bar with loss & GPU memory
+                pbar.set_postfix({
+                    "Loss": f"{loss.item():.4f}",
+                    "GPU(MB)": f"{torch.cuda.memory_allocated()/1e6:.1f}"
+                })
+
+        # Compute epoch metrics
         train_loss = running_loss / len(train_loader)
         train_acc = 100 * correct / total
 
@@ -109,7 +128,8 @@ def main():
         # Print epoch metrics
         print(f"Epoch {epoch+1}/{EPOCHS} | "
               f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
-              f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%")
+              f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}% | "
+              f"GPU Memory: {torch.cuda.memory_allocated()/1e6:.1f} MB")
 
         # W&B logging
         wandb.log({
@@ -118,7 +138,7 @@ def main():
             "Train Accuracy": train_acc,
             "Val Loss": val_loss,
             "Val Accuracy": val_acc,
-            "GPU Memory (MB)": torch.cuda.memory_allocated() / 1e6
+            "GPU Memory (MB)": torch.cuda.memory_allocated()/1e6
         })
 
         # Save best model
