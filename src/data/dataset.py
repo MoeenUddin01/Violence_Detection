@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 import cv2
 import numpy as np
 
+
 class VideoDataset(Dataset):
     def __init__(self, root_dir, frames_per_video=8, transform=None):
         """
@@ -21,10 +22,12 @@ class VideoDataset(Dataset):
         self.video_paths = []
         self.labels = []
         self.class_to_idx = {}
+
         classes = sorted(os.listdir(root_dir))
         for idx, cls in enumerate(classes):
             self.class_to_idx[cls] = idx
             cls_folder = os.path.join(root_dir, cls)
+
             for file in os.listdir(cls_folder):
                 if file.endswith((".mp4", ".avi")):
                     self.video_paths.append(os.path.join(cls_folder, file))
@@ -37,14 +40,22 @@ class VideoDataset(Dataset):
         video_path = self.video_paths[idx]
         label = self.labels[idx]
 
-        # Load video frames
+        # Load video frames -> list of (H, W, 3)
         frames = self._load_video(video_path)
 
-        if self.transform:
-            frames = [self.transform(f) for f in frames]
+        processed_frames = []
+        for frame in frames:
+            # frame is numpy array (H, W, 3)
+            if self.transform:
+                frame = self.transform(frame)   # -> (3, 112, 112)
+            else:
+                frame = torch.from_numpy(frame).permute(2, 0, 1).float() / 255.0
 
-        # Stack frames to (T, C, H, W)
-        frames = torch.stack(frames)
+            processed_frames.append(frame)
+
+        # Stack -> (T, 3, 112, 112)
+        frames = torch.stack(processed_frames)
+
         return frames, torch.tensor(label, dtype=torch.long)
 
     def _load_video(self, path):
@@ -56,11 +67,15 @@ class VideoDataset(Dataset):
         for fid in frame_ids:
             cap.set(cv2.CAP_PROP_POS_FRAMES, fid)
             ret, frame = cap.read()
+
             if not ret:
-                # fallback: use last successfully read frame
-                frame = frames[-1] if frames else np.zeros((224,224,3), np.uint8)
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(torch.from_numpy(frame))
+                # fallback frame (112x112 to match pipeline)
+                frame = np.zeros((112, 112, 3), dtype=np.uint8)
+            else:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            frames.append(frame)
+
         cap.release()
         return frames
 
@@ -71,12 +86,15 @@ class VideoDataset(Dataset):
         - Randomly pick one frame from each segment
         """
         if total_frames < self.frames_per_video:
-            # Repeat some frames if video too short
             frame_ids = list(range(total_frames))
             while len(frame_ids) < self.frames_per_video:
                 frame_ids.append(random.choice(frame_ids))
         else:
             seg_size = total_frames / self.frames_per_video
-            frame_ids = [int(seg_size*i + random.uniform(0, seg_size)) for i in range(self.frames_per_video)]
-            frame_ids = [min(fid, total_frames-1) for fid in frame_ids]
+            frame_ids = [
+                int(seg_size * i + random.uniform(0, seg_size))
+                for i in range(self.frames_per_video)
+            ]
+            frame_ids = [min(fid, total_frames - 1) for fid in frame_ids]
+
         return frame_ids
