@@ -1,15 +1,14 @@
-# src/pipelines/model_training.py
-
 import os
 from datetime import datetime
 
 import torch
 from tqdm import tqdm
+import wandb
 
-from src.data.loader import get_train_loader
+from src.data.loader import get_train_loader, get_test_loader
 from src.models.cnn import CNN
 from src.models.train import Trainer
-import wandb
+
 
 def main():
     # --------------------------
@@ -21,13 +20,13 @@ def main():
     # --------------------------
     # Hyperparameters
     # --------------------------
-    BATCH_SIZE = 1           # smaller batch for safer GPU/CPU usage
+    BATCH_SIZE = 1
     EPOCHS = 10
     LR = 1e-3
-    FRAMES_PER_VIDEO = 2     # fewer frames to reduce memory usage
+    FRAMES_PER_VIDEO = 2
 
     # --------------------------
-    # Checkpoint directory (Drive)
+    # Checkpoint directory
     # --------------------------
     checkpoint_dir = "/content/drive/MyDrive/Violence_Detection/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -48,13 +47,18 @@ def main():
         id="2p476n8w",
         resume="must",
         name=f"Run-{datetime.now().strftime('%d_%m_%Y_%H_%M')}"
-
     )
 
     # --------------------------
-    # Load data
+    # Data loaders
     # --------------------------
     train_loader = get_train_loader(
+        batch_size=BATCH_SIZE,
+        num_workers=0,
+        frames_per_video=FRAMES_PER_VIDEO
+    )
+
+    val_loader = get_test_loader(
         batch_size=BATCH_SIZE,
         num_workers=0,
         frames_per_video=FRAMES_PER_VIDEO
@@ -95,11 +99,15 @@ def main():
         print(f"\n🔥 Starting epoch {epoch + 1}/{EPOCHS}")
         torch.cuda.empty_cache()
 
+        # ===== TRAINING =====
+        trainer.model.train()
         running_loss = 0.0
         correct = 0
         total = 0
 
-        for batch_idx, (frames, labels) in enumerate(tqdm(train_loader, desc=f"Epoch {epoch + 1}")):
+        for batch_idx, (frames, labels) in enumerate(
+            tqdm(train_loader, desc=f"Epoch {epoch + 1}")
+        ):
             frames = frames.to(DEVICE)
             labels = labels.to(DEVICE)
 
@@ -116,41 +124,61 @@ def main():
                 correct += (preds == labels).sum().item()
                 total += labels.size(0)
 
-                # --------------------------
-                # Batch-level logging
-                # --------------------------
                 wandb.log({
                     "batch_loss": loss.item(),
                     "batch_index": batch_idx,
-                    "epoch": epoch + 1,
-                    "gpu_memory_mb": torch.cuda.memory_allocated() / 1e6
+                    "epoch": epoch + 1
                 })
 
             except RuntimeError as e:
                 print(f"⚠️ RuntimeError in batch {batch_idx}: {e}")
-                torch.cuda.empty_cache()  # free GPU memory
-                continue  # skip this batch
+                torch.cuda.empty_cache()
+                continue
 
-        # --------------------------
-        # Epoch metrics
-        # --------------------------
-        train_loss = running_loss / len(train_loader)
-        train_acc = 100 * correct / total
+        average_epoch_training_loss = running_loss / len(train_loader)
+        epoch_training_acc = 100 * correct / total
+
+        # ===== VALIDATION =====
+        trainer.model.eval()
+        val_running_loss = 0.0
+        val_correct = 0
+        val_total = 0
+
+        with torch.no_grad():
+            for frames, labels in val_loader:
+                frames = frames.to(DEVICE)
+                labels = labels.to(DEVICE)
+
+                outputs = trainer.model(frames)
+                loss = trainer.criterion(outputs, labels)
+
+                val_running_loss += loss.item()
+                _, preds = torch.max(outputs, 1)
+                val_correct += (preds == labels).sum().item()
+                val_total += labels.size(0)
+
+        average_epoch_validation_loss = val_running_loss / len(val_loader)
+        epoch_validation_acc = 100 * val_correct / val_total
+
+        # ===== W&B EPOCH LOG (YOUR REQUIRED FORMAT) =====
+        wandb.log({
+            "Training Loss": average_epoch_training_loss,
+            "Validation Loss": average_epoch_validation_loss,
+            "Epoch": epoch + 1,
+            "Training Accuracy": epoch_training_acc,
+            "Validation Accuracy": epoch_validation_acc
+        })
 
         print(
             f"Epoch {epoch + 1} | "
-            f"Train Loss: {train_loss:.4f} | "
-            f"Train Acc: {train_acc:.2f}%"
+            f"Train Loss: {average_epoch_training_loss:.4f} | "
+            f"Val Loss: {average_epoch_validation_loss:.4f} | "
+            f"Train Acc: {epoch_training_acc:.2f}% | "
+            f"Val Acc: {epoch_validation_acc:.2f}%"
         )
 
-        wandb.log({
-            "epoch_loss": train_loss,
-            "epoch_accuracy": train_acc,
-            "epoch": epoch + 1
-        })
-
         # --------------------------
-        # Save checkpoint (resume-safe)
+        # Save checkpoint
         # --------------------------
         torch.save({
             "epoch": epoch,
@@ -158,10 +186,11 @@ def main():
             "optimizer_state": trainer.optimizer.state_dict()
         }, checkpoint_path)
 
-        print(f"💾 Checkpoint saved to {checkpoint_path}")
         wandb.save(checkpoint_path)
+        print(f"💾 Checkpoint saved")
 
     print("\n🏁 Training complete!")
+
 
 if __name__ == "__main__":
     main()
