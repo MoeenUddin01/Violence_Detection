@@ -36,7 +36,7 @@ def main():
             
         },
         id="2p476n8w",
-        resume="must"
+        resume="must",
         
         name=f"Run-{datetime.now().strftime('%d_%m_%Y_%H_%M')}"
     )
