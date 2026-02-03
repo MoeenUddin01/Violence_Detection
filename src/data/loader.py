@@ -9,11 +9,24 @@ test_dir = "datas/processed/test"
 
 def get_train_loader(batch_size=2, num_workers=0, frames_per_video=8):
     dataset = VideoDataset(root_dir=train_dir, frames_per_video=frames_per_video, transform=train_transform)
-    # batch dry-run: test a single batch
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=False
+    )
     return loader
 
 def get_test_loader(batch_size=2, num_workers=0, frames_per_video=8):
     dataset = VideoDataset(root_dir=test_dir, frames_per_video=frames_per_video, transform=test_transform)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=False
+    )
     return loader
