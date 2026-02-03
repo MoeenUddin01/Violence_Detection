@@ -25,10 +25,10 @@ def main():
     # --------------------------
     # Hyperparameters
     # --------------------------
-    BATCH_SIZE = 4
+    BATCH_SIZE = 2
     EPOCHS = 10
     LR = 1e-3
-    FRAMES_PER_VIDEO = 8
+    FRAMES_PER_VIDEO = 4
 
     # --------------------------
     # Checkpoint directory (Drive)
