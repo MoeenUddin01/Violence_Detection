@@ -49,8 +49,8 @@ def main():
             "frames_per_video": FRAMES_PER_VIDEO,
             "device": DEVICE
         },
-        id="aj1c1x4w",
-        resume="must",
+        # id="aj1c1x4w",
+        # resume="must",
         name=f"Run-{datetime.now().strftime('%d_%m_%Y_%H_%M')}"
     )
 
