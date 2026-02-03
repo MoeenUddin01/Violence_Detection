@@ -38,8 +38,8 @@ def main():
     # --------------------------
     wandb.init(
         project="Violence-Detection-CNN",
-        id="2p476n8w",       # previous run ID
-        resume="must",       # resume this run
+        #id="2p476n8w",       # previous run ID
+        #resume="must",       # resume this run
         name=f"Run-{datetime.now().strftime('%d_%m_%Y_%H_%M')}",
         config={
             "batch_size": BATCH_SIZE,
