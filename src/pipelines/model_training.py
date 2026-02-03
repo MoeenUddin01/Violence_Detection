@@ -38,8 +38,8 @@ def main():
     # --------------------------
     wandb.init(
         project="Violence-Detection-CNN",
-        #id="2p476n8w",       # <— previous run ID
-        #resume="must",       # <— continue this run
+        id="2p476n8w",       # previous run ID
+        resume="must",       # resume this run
         name=f"Run-{datetime.now().strftime('%d_%m_%Y_%H_%M')}",
         config={
             "batch_size": BATCH_SIZE,
@@ -47,7 +47,8 @@ def main():
             "learning_rate": LR,
             "frames_per_video": FRAMES_PER_VIDEO,
             "device": DEVICE
-        }
+        },
+        settings=wandb.Settings(start_method="thread")  # enable system logging
     )
 
     # --------------------------
@@ -80,6 +81,11 @@ def main():
     # --------------------------
     model = CNN(num_classes=2).to(DEVICE)
     trainer = Trainer(model=model, learning_rate=LR, device=DEVICE)
+
+    # --------------------------
+    # Enable W&B system logging
+    # --------------------------
+    wandb.watch(trainer.model, log="all", log_freq=10)
 
     # --------------------------
     # Resume training if checkpoint exists
